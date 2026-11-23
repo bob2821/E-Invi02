@@ -699,7 +699,7 @@ const scrollEl = $("scroll"), scrollPaper = $("scrollPaper"), rodB = $("rodB"); 
 function setRoll(){
   const k = 1 - rollP;
   scrollPaper.style.transform = k > 0 ? "rotateX(" + (k*74).toFixed(1) + "deg) translateY(" + (k*10).toFixed(1) + "%)" : "";
-  scrollPaper.style.opacity = Math.min(1, .1 + rollP*1.3).toFixed(2);
+  scrollPaper.style.opacity = Math.max(0, Math.min(1, rollP*1.7 - .3)).toFixed(2);   /* invisible while it is still edge-on, so it never reads as a stray bar */
   $("scrollHint").style.opacity = rollP > .12 ? "0" : "";
 }
 scrollEl.addEventListener("click", () => { rollT = 1; });
@@ -737,7 +737,7 @@ window.addEventListener("pointerdown", e => { S.rip = [(e.clientX - cx0 - cw/2)/
 function buzz(ms){ try { if (navigator.vibrate) navigator.vibrate(ms); } catch(e){} }
 
 /* ---------- The heart: it beats on its own; a tap makes it leap and scatter small hearts, a drag turns it ---------- */
-const pad = $("ringPad"); let hx0 = null, hmoved = 0, loveA = 0, loveV = 0, lovePulse = 0;
+const pad = $("ringPad"), padHint = pad.querySelector(".hintline"); let hx0 = null, hmoved = 0, loveA = 0, loveV = 0, lovePulse = 0;
 function loveTap(){
   lovePulse = 1; S.burst = .9; buzz(40);
   if (R && W.love){ const py = ch*(.5 - (W.ringsWrap.position.y - cam.position.y)/(2*halfH)); burstAt(cx0 + cw/2, py, 44, 1.5); setTimeout(() => burstAt(cx0 + cw/2, py, 30, 1.15), 420); }
@@ -1011,22 +1011,20 @@ const BG_FS = "varying vec2 vUv;uniform float uAspect;uniform float uT;uniform f
 " vec2 rd=p-uRip.xy;float rl=length(rd);" +
 " float rw=exp(-uRip.z*2.2)*sin(rl*30.-uRip.z*11.)*exp(-rl*3.5)*smoothstep(0.,.08,uRip.z);" +
 " p+=rd/(rl+.001)*rw*.012;p+=uTilt*.03;p.y-=uScroll*.1;" +
-" vec2 q=p*1.35;q.x+=.32*sin(q.y*1.9+uT*.13);" +
-" float n=fbm(q*vec2(1.1,2.1)+vec2(0.,uT*.028));" +
-" float ph=(q.x*2.6+n*3.6+q.y*.55)*2.;" +
-" float sheen=pow(.5+.5*sin(ph),3.2);float shade=.5+.5*sin(ph-1.3);" +
-" vec3 col=mix(vec3(.006,.04,.028),vec3(.022,.16,.11),n);" +
-" col*=.6+.5*shade;col+=vec3(.08,.42,.28)*sheen*.28;col+=vec3(.86,.72,.45)*pow(sheen,5.)*.05;" +
+" float n=fbm(p*.55+vec2(uT*.008,uT*.012));" +
+" float pool=smoothstep(1.5,0.,length((p-vec2(0.,.1))*vec2(1.1,1.)));" +
+" vec3 col=mix(vec3(.007,.046,.033),vec3(.032,.19,.132),pool*pool*(3.-2.*pool));" +
+" col*=.82+.36*n;" +
 " for(int i=0;i<3;i++){float fi=float(i);float sc=7.+fi*5.;" +
 "  vec2 g=p*sc+vec2(fi*13.1,-uScroll*(.2+fi*.26)*sc+uT*(.02+.012*fi));g+=uTilt*(.25+.3*fi);" +
 "  vec2 id=floor(g);vec2 f=fract(g)-.5;float h=hash(id+fi*7.);" +
 "  vec2 o=(vec2(hash(id+1.7),hash(id+9.2))-.5)*.6;float d=length(f-o);" +
 "  float tw=.5+.5*sin(uT*(1.+h*2.)+h*40.);float r=.03+.035*hash(id+3.3);" +
 "  col+=vec3(1.,.8,.46)*step(.6,h)*tw*smoothstep(r,0.,d)*(.36-.08*fi)*(1.+uBurst*2.5);}" +
-" col+=vec3(.95,.78,.46)*max(rw,0.)*.08;" +
+
 " col=mix(col,vec3(col.r*1.5+.012,col.g*.92,col.b*1.5+.01),uMood);" +
 " vec2 c=vUv-.5;col*=1.-dot(c,c)*1.05;col+=vec3(.1,.4,.26)*uBurst*.05;" +
-" col+=(hash(vUv*913.+uT)-.5)*.012;" +
+" col+=(hash(vUv*913.+uT)-.5)*.02;" +
 " col=max(col,0.);col=mix(col,pow(col,vec3(2.2)),uGamma);" +
 " gl_FragColor=vec4(col,1.);}";
 
@@ -1444,7 +1442,7 @@ function resize(){
   fitEnvelope();
   const pages = S.docH/Math.max(1, innerHeight), range = pages*scrollK + halfH*2 + 3, top = halfH + 1.5;
   W.hearts.forEach(h => { h.y = top - h.frac*range; h.m.position.set(h.nx*(camD - h.z)*TANH*aspect*1.02, h.y, h.z); });
-  const rs = Math.min(1.25, halfH*aspect*.6, halfH*.25); W.ringsWrap.scale.setScalar(rs*.82); W.ringsWrap.position.set(0, -pages*scrollK - halfH*.66, -1.2);   /* sized to the space under the closing words on any screen */
+  const rs = Math.min(1.25, halfH*aspect*.6, halfH*.25); W.loveS = rs*.82; W.ringsWrap.scale.setScalar(W.loveS); W.ringsWrap.position.set(0, -pages*scrollK - halfH*.66, -1.2);   /* sized to the space under the closing words on any screen */
 }
 
 /* Burst hearts: thrown from a point on screen, pulled down by gravity. */
@@ -1481,7 +1479,11 @@ function render(t, dt){
     m.rotation.x += dt*p.w*.6; m.rotation.y += dt*p.w;
     const k = p.life/p.max; m.scale.setScalar(p.s*Math.min(1, p.life*7)*(1 - k*k*k));
   }
-  W.ringsWrap.visible = pageMode && S.scroll > .8;   /* the closing heart belongs to the last screen; it must never show behind the curtain */
+  W.ringsWrap.visible = pageMode && S.scroll > .8;
+  if (W.ringsWrap.visible){                         /* the heart sits midway between the date line and the hint, on any screen, and never larger than that space allows */
+    const fb = $("fine").getBoundingClientRect().bottom, ht = padHint.getBoundingClientRect().top;
+    if (fb < ch*1.5){ const kd = (camD + 1.2)/camD, ppu = ch/(2*halfH*kd), gap = Math.max(60, ht - fb);
+      W.ringsWrap.position.y = cam.position.y + (1 - (fb + ht)/ch)*halfH*kd; W.ringsWrap.scale.setScalar(Math.min(W.loveS, gap*.25/ppu)); } }   /* the closing heart belongs to the last screen; it must never show behind the curtain */
   const hb = (tt*1.05) % 1, beat = Math.exp(-Math.pow((hb - .08)*14, 2)) + .6*Math.exp(-Math.pow((hb - .3)*14, 2));   /* lub-dub */
   if (hx0 === null){ loveA += loveV; loveV *= .95; } lovePulse = Math.max(0, lovePulse - dt*1.6);
   W.love.scale.setScalar(.92*(1 + .05*beat + .22*lovePulse*Math.sin(lovePulse*9)));
