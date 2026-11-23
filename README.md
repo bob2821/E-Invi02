@@ -1,4 +1,4 @@
-# Anirudh & Kaviya — interactive wedding invitation
+# Arjun & Meera — interactive wedding invitation
 
 A single-page invitation: a cord-tied envelope that unties on tap, then the invitation with a scratch-to-reveal date,
 countdown, function cards, photo stack, an unrolling venue scroll, a press-and-hold heart burst and 3D wedding rings.
