@@ -402,6 +402,8 @@ h2{font-family:var(--label);font-weight:500;text-transform:uppercase;font-size:c
 #flow .face.back .when{font-size:calc(var(--u)*4);opacity:.85;margin:calc(var(--u)*1.6) 0 0}
 #flow .face.back .sw{width:calc(var(--u)*4.4);height:calc(var(--u)*4.4);margin:0 calc(var(--u)*2.4) 0 calc(var(--u)*.6);box-shadow:0 0 0 1px var(--ivory)}
 .ringpad{height:50%}
+#curtainShot{position:absolute;left:0;top:0;width:100%;z-index:0;pointer-events:none;-webkit-user-select:none;user-select:none;object-fit:cover;object-position:50% 0;-webkit-mask-image:linear-gradient(#000 94%,transparent);mask-image:linear-gradient(#000 94%,transparent)}
+main > section{position:relative;z-index:1}
 .desk{display:none}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
@@ -755,6 +757,7 @@ function openInvite(){
   document.body.classList.remove("locked"); document.body.classList.add("open"); gate.setAttribute("aria-hidden","true");
   setTimeout(() => { resize(); layoutFlow(); }, 60);
 }
+const mainEl2 = document.querySelector("main");
 function enterPage(){ pageMode = true; }
 function startOpen(){
   if (opening) return; opening = true; askGyro(); buzz(18);
@@ -1130,7 +1133,7 @@ function Cloth(a, b, dir, mat, front){
   /* the cloth is simulated on a 49 x 41 grid, then smoothed and doubled across the pleats for drawing, so folds come out round instead of faceted */
   const C = this.C = 48, RW = this.RW = 40, n = (C + 1)*(RW + 1), CR = this.CR = C*2, nr = (CR + 1)*(RW + 1); this.P = 6;
   this.a = a; this.b = b; this.dir = dir; this.front = !!front; this.tone = .66;
-  this.xo = dir*a*(front ? 1.04 : 1.12); this.xi = front ? dir*a*.02 : -dir*a*.035; this.top = b*1.02; this.dy = b*2.3/RW; this.z0 = dir < 0 ? .36 : .1;
+  this.xo = dir*a*(front ? 1.04 : 1.12); this.xi = front ? dir*a*.02 : -dir*a*.035; this.top = b*1.02; this.dy = b*2.07/RW; this.z0 = dir < 0 ? .36 : .1;
   this.s0 = Math.abs(this.xi - this.xo)/C; this.Ls = this.s0*(front ? 1.32 : 1.7); this.Ld = Math.hypot(this.Ls, this.dy);
   this.jt = Math.round(RW*.5); this.tx = dir*a*.84; this.ty = this.top - b*1.12; this.rc = this.Ls*C*.075;
   this.p = new Float32Array(n*3); this.q = new Float32Array(n*3); this.sp = new Float32Array(n*3); this.sn = new Float32Array(n*3);
@@ -1211,7 +1214,7 @@ Cloth.prototype.write = function(){
    the cloth keeps its width, so the tighter a row is gathered the deeper its pleats. One depth per point, so it cannot fold through itself. */
 function Drape(a, b, dir, mat){
   const C = this.C = 96, RW = this.RW = 64, n = (C + 1)*(RW + 1);
-  this.a = a; this.b = b; this.dir = dir; this.z0 = .78; this.yT = b*1.06; this.yB = -b*1.2; this.vt = (this.yT + b*.04)/(this.yT - this.yB);
+  this.a = a; this.b = b; this.dir = dir; this.z0 = .78; this.yT = b*1.06; this.yB = -b*1.04; this.vt = (this.yT + b*.04)/(this.yT - this.yB);
   this.tx = dir*a*.9; this.ty = -b*.04; this.rc = a*.1; this.kx = 0; this.kv = 0;
   this.sp = this.pos = new Float32Array(n*3); this.sn = this.nor = new Float32Array(n*3); this.col = new Float32Array(n*3);
   const uv = new Float32Array(n*2), I = [];
@@ -1500,9 +1503,9 @@ function render(t, dt){
     if (t > .3 && !cu.auto) cu.auto = true;
     if (cu.auto && cu.t0 > .9 && !W.f1){ W.f1 = true; openInvite(); }           /* the names appear only once the curtain has drawn clear */       /* the invitation fades up in the widening gap */
     if (cu.auto && cu.t0 >= 1 && !W.f2){ W.f2 = true; enterPage(); }
-    W.stage.position.y = S.scroll*(2*halfH*1.5 - scrollK);                       /* once open the curtains belong to the first screen and scroll away with it */
-    W.stage.visible = S.scroll < .98;
-    if (W.stage.visible){
+    W.stage.position.y = S.scroll*(2*halfH*(camD - .6)/camD - scrollK);                       /* once open the curtains belong to the first screen and scroll away with it */
+    W.stage.visible = S.scroll < 1.2;
+    if (W.stage.visible && !W.shot){
       W.simT = Math.min(.034, (W.simT || 0) + dt);
       const hz = (W.f2 && (W.calmT = (W.calmT || 0) + dt) > 4 && gx0 === null) ? 1/30 : 1/60;   /* once everything has settled the cloth is stepped half as often, to spare the phone */
       while (W.simT >= hz){ W.simT -= hz; for (let i = 0; i < W.curt.length; i++) W.curt[i].step(1/60, t, tt); }
@@ -1513,6 +1516,17 @@ function render(t, dt){
   if (!pageMode){ cam.position.set(0, 0, camD); cam.rotation.set(0, 0, 0); }
   else { const stl = S.settle = Math.min(1, (S.settle || 0) + dt*.4); cam.position.set(S.tx*.3*stl, -S.scroll*scrollK - S.ty*.15*stl, camD); cam.rotation.set(-S.ty*.02*stl, S.tx*.03*stl, 0); }
   if (composer){ bloom.enabled = pageMode && quality < 2; bloom.strength = glow*(S.settle || 0); composer.render();   /* the glow eases in, so there is no jump in brightness as the page takes over */ } else R.render(scene, cam);
+  /* Once the curtains have opened and come to rest, this very frame is laid into the page as a picture behind the first screen.
+     From then on the curtains are part of the page itself: they scroll with the names exactly, with nothing to recompute. */
+  if (W.curt && W.f2 && !W.shot && (S.settle || 0) >= 1 && (W.calmT || 0) > 3.4 && S.scroll === 0 && gx0 === null && R.domElement.toBlob){
+    W.shot = 1; const hpx = ch;
+    R.domElement.toBlob(bl => { if (!bl){ W.shot = 0; W.calmT = 0; return; }
+      const im = new Image(); im.id = "curtainShot"; im.alt = ""; im.setAttribute("aria-hidden", "true"); im.decoding = "sync";
+      im.onload = () => { im.style.height = hpx + "px"; mainEl2.insertBefore(im, mainEl2.firstChild);
+        requestAnimationFrame(() => requestAnimationFrame(() => { if (W.stage){ W.stage.visible = false; scene.remove(W.stage); } W.curt = null; W.shot = 2; })); };
+      im.onerror = () => { W.shot = 0; W.calmT = 0; };
+      im.src = URL.createObjectURL(bl); }, "image/jpeg", .93);
+  }
 }
 
 /* ---------- Main loop with adaptive quality ---------- */
